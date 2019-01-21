@@ -1,0 +1,94 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "nsgName": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the NSG that will be created."
+      }
+    },
+    "NetworkSecurityGroupEventRetention": {
+      "type": "int",
+      "defaultValue": 180
+    },
+    "NetworkSecurityGroupRuleCounterRetention": {
+      "type": "int",
+      "defaultValue": 180
+    },
+    "storageAccountName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Name of the Storage Account in which Diagnostic Logs should be saved."
+      }
+    },
+    "workspaceName": {
+      "type": "string",
+      "defaultValue": ""
+    },
+    "eventHubNamespace": {
+      "defaultValue": "",
+      "type": "string"
+    }
+  },
+  "variables": {
+    "eventHubAuthorizationRuleId": "[concat(resourceId('Microsoft.EventHub/namespaces',parameters('eventHubNamespace')),'/AuthorizationRules','/RootManageSharedAccessKey')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "name": "[parameters('nsgName')]",
+      "apiVersion": "2016-03-30",
+      "location": "eastus2",
+      "properties": {
+        "securityRules": []
+      },
+      "dependson": [
+        /*"[if(greater(length(parameters('storageAccountName')),0),resourceId('Microsoft.Storage/storageAccounts',parameters('storageAccountName')),'')]",
+        "[if(greater(length(parameters('workspaceName')),0),resourceId('Microsoft.OperationalInsights/workspaces',parameters('workspaceName')),'')]",
+        "[if(greater(length(parameters('eventHubNamespace')),0),resourceId('Microsoft.EventHub/Namespaces',parameters('eventHubNamespace')),'')]"*/
+      ],
+      "resources": [
+        {
+          "type": "providers/diagnosticSettings",
+          "name": "Microsoft.Insights/service",
+          "dependsOn": [
+            "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('nsgName'))]",
+          ],
+          "apiVersion": "2015-07-01",
+          "properties": {
+            "storageAccountId": "[if(greater(length(parameters('storageAccountName')),0),resourceId('Microsoft.Storage/storageAccounts',parameters('storageAccountName')),json('null'))]",
+            "eventHubAuthorizationRuleId": "[if(greater(length(parameters('eventHubNamespace')),0),variables('eventHubAuthorizationRuleId'),json('null'))]",
+            "workspaceId": "[if(greater(length(parameters('workspaceName')),0),resourceId('Microsoft.OperationalInsights/workspaces',parameters('workspaceName')),json('null'))]",
+            "eventHubName": "[if(greater(length(parameters('eventHubNamespace')),0),parameters('eventHubNamespace'),json('null'))]",
+            "logs": [
+              {
+                "category": "NetworkSecurityGroupEvent",
+                "enabled": true,
+                "retentionPolicy": {
+                  "days": "[parameters('NetworkSecurityGroupEventRetention')]",
+                  "enabled": true
+                }
+              },
+              {
+                "category": "NetworkSecurityGroupRuleCounter",
+                "enabled": true,
+                "retentionPolicy": {
+                  "days": "[parameters('NetworkSecurityGroupRuleCounterRetention')]",
+                  "enabled": true
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "outputs": {
+    "NSGId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Network/networkSecurityGroups',parameters('nsgName'))]"
+    },
+  }
+}
